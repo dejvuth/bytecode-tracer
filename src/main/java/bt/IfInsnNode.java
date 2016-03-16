@@ -8,42 +8,21 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 
 public class IfInsnNode extends AbstractInsnNode {
 
-	public Object value1;
-	public Object value2;
-	
 	public String jumpLabel;
 	public String nextLabel;
 	
-	public IfInsnNode(final int opcode, final int value, final String jumpLabel, final String nextLabel) {
+	public IfInsnNode(final int opcode, final String jumpLabel, final String nextLabel) {
 		super(opcode);
-		this.value1 = value;
 		this.jumpLabel = jumpLabel;
 		this.nextLabel = nextLabel;
 	}
 	
-	public IfInsnNode(final int opcode, final int value1, final int value2, final String jumpLabel, final String nextLabel) {
+	public IfInsnNode(final int opcode, final String jumpLabel) {
 		super(opcode);
-		this.value1 = value1;
-		this.value2 = value2;
 		this.jumpLabel = jumpLabel;
-		this.nextLabel = nextLabel;
+		this.nextLabel = null;
 	}
 	
-	public IfInsnNode(final int opcode, final Object value1, final Object value2, final String jumpLabel, final String nextLabel) {
-		super(opcode);
-		this.value1 = value1;
-		this.value2 = value2;
-		this.jumpLabel = jumpLabel;
-		this.nextLabel = nextLabel;
-	}
-	
-	public IfInsnNode(final int opcode, final Object value, final String jumpLabel, final String nextLabel) {
-		super(opcode);
-		this.value1 = value;
-		this.jumpLabel = jumpLabel;
-		this.nextLabel = nextLabel;
-	}
-
 	@Override
 	public void accept(MethodVisitor arg0) {
 		// TODO Auto-generated method stub
@@ -66,7 +45,7 @@ public class IfInsnNode extends AbstractInsnNode {
 	}
 	
 	public IfInsnNode cloneReverse() {
-		return new IfInsnNode(reverseOpcode(opcode), value1, value1, jumpLabel, nextLabel);
+		return new IfInsnNode(reverseOpcode(opcode), jumpLabel, nextLabel);
 	}
 
 	private static int reverseOpcode(int opcode) {

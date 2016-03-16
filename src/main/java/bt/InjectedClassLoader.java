@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collection;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -13,26 +15,61 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.TraceClassVisitor;
 
+/**
+ * A ClassLoader that injects tracing bytecode instructions.
+ * 
+ * @author suwimont
+ *
+ */
 public class InjectedClassLoader extends ClassLoader {
 	
+	private String traceCollector;
+	
+	private Collection<String> ignoredPrefixes;
+	
 	public static final String STUB_PREFIX = "stub";
+	
+	/**
+	 * Constructs a class loader with the given trace collector.
+	 * 
+	 * @param traceCollector the collector name.
+	 */
+	public InjectedClassLoader(String traceCollector) {
+		this.traceCollector = traceCollector;
+
+		ignoredPrefixes = new ArrayList<String>();
+		ignoredPrefixes.add("java.");
+		ignoredPrefixes.add("javax.");
+		ignoredPrefixes.add("org.slf4j.");
+		ignoredPrefixes.add("ch.qos.logback.");
+		ignoredPrefixes.add("org.objectweb.asm.");
+		ignoredPrefixes.add("org.xml.");
+		ignoredPrefixes.add("com.sun.");
+		ignoredPrefixes.add("bt.");
+	}
 
 	@Override
 	public Class<?> loadClass(String name) throws ClassNotFoundException {
-		if (name.startsWith("java."))
+		// Ignores packages
+		if (ignoredPrefixes.stream().anyMatch(s -> name.startsWith(s)))
 			return super.loadClass(name);
 		
+		// TODO Loads stub
 		if (name.startsWith(STUB_PREFIX))
 			return loadStub(name);
 		
+		// Injects tracing instructions
 		try {
 			ClassReader cr = new ClassReader(name);
 			ClassWriter cw = new ClassWriter(cr, 0);
-			TraceClassVisitor tcv = new TraceClassVisitor(cw, new PrintWriter(System.getProperty("java.io.tmpdir") + File.separator + name.replace('/', '.') + ".jbc"));
-			TraceClassAdapter tca = new TraceClassAdapter(tcv);
+			TraceClassVisitor tcv = new TraceClassVisitor(cw, 
+					new PrintWriter(System.getProperty("java.io.tmpdir") 
+							+ File.separator + name.replace('/', '.') + ".jbc"));
+			TraceClassAdapter tca = new TraceClassAdapter(
+					tcv, traceCollector.replace('.', '/'));
 			cr.accept(tca, 0);
+
 			byte[] b = cw.toByteArray();
-			
 			return defineClass(name, b, 0, b.length);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -40,36 +77,25 @@ public class InjectedClassLoader extends ClassLoader {
 		}
 	}
 	
-	private Class<?> loadStub(String name) {
+	// TODO
+	private Class<?> loadStub(String name) throws ClassNotFoundException {
 		String origName = name.replace(STUB_PREFIX + ".", "");
 		
-		ClassReader cr = null;
 		try {
-//			System.out.println("Reading " + origName);
-			cr = new ClassReader(origName);
+			ClassReader cr = new ClassReader(origName);
+			ClassWriter cw = new ClassWriter(cr, 0);
+			TraceClassVisitor tcv = new TraceClassVisitor(cw, 
+					new PrintWriter(System.getProperty("java.io.tmpdir") 
+							+ File.separator + STUB_PREFIX + "." + origName + ".jbc"));
+			ClassVisitor cv = new StubClassAdapter(tcv);
+			cr.accept(cv, 0);
+
+			byte[] b = cw.toByteArray();
+			return defineClass(name, b, 0, b.length);
 		} catch (IOException e) {
 			e.printStackTrace();
+			throw new ClassNotFoundException(e.getMessage());
 		}
-		ClassWriter cw = new ClassWriter(cr, 0);
-		TraceClassVisitor tcv = null;
-		try {
-			tcv = new TraceClassVisitor(cw, new PrintWriter(System.getProperty("java.io.tmpdir") + File.separator + "stub" + origName + ".jbc"));
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		ClassVisitor cv = new StubClassAdapter(tcv);
-		cr.accept(cv, 0);
-		
-		byte[] b = cw.toByteArray();
-		Class<?> c = null;
-		try {
-			c = defineClass(name, b, 0, b.length);
-//			System.out.println("DONE origName: " + origName);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return c;
 	}
 	
 	class StubClassAdapter extends ClassVisitor {
@@ -85,7 +111,7 @@ public class InjectedClassLoader extends ClassLoader {
 	            String superName, String[] interfaces) {
 			className = name;
 			
-			// Transform superName
+			// Transforms superName
 			if (superName == null)
 				superName = "java/lang/Object";
 			else if ((access & Opcodes.ACC_INTERFACE) == 0	// superName of interface must be java/lang/Object 
@@ -107,6 +133,7 @@ public class InjectedClassLoader extends ClassLoader {
 		public void visitInnerClass(String name, String outerName,
 	            String innerName, int access) {
 			
+			// FIXME
 			if (name != null && name.startsWith("java/"))
 				name = "stub/" + name;
 			if (outerName != null && outerName.startsWith("java/"))
@@ -126,9 +153,10 @@ public class InjectedClassLoader extends ClassLoader {
 		public MethodVisitor visitMethod(int access, String name, String desc,
 	            String signature, String[] exceptions) {
 			
-			// Transform method descriptor
+			// Transforms method descriptor
 			desc = TraceMethodAdapter.replaceStub(desc);
 			
+			// FIXME
 			if (exceptions != null) {
 				for (int i = 0; i < exceptions.length; i++) {
 					exceptions[i] = exceptions[i].replaceAll("java/", "stub/java/");
@@ -138,7 +166,7 @@ public class InjectedClassLoader extends ClassLoader {
 			MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
 			
 			return new TraceMethodAdapter(access, name, desc, signature, exceptions, mv, 
-					className);
+					className, traceCollector.replace('.', '/'));
 		}
 	}
 }

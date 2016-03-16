@@ -18,35 +18,50 @@ import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.MultiANewArrayInsnNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.util.Printer;
 
 public class TraceMethodAdapter extends MethodNode implements Opcodes {
 
-private String className;
+	private String className;
+	private String traceCollector;
 	
+	// Maps hash values to label strings (methodName + runningNumber)
 	private Map<Integer, String> labels = new HashMap<>();
+	
+	private boolean tracesStub = false;
 	
 	public TraceMethodAdapter(int access, String name, String desc,
 			String signature, String[] exceptions, MethodVisitor mv, 
-			String className) {
+			String className, String traceCollector) {
 		super(ASM5, access, name, desc, signature, exceptions);
 		this.mv = mv;
 		this.className = className;
+		this.traceCollector = traceCollector;
+	}
+	
+	public void setTracesStub(boolean tracesStub) {
+		this.tracesStub = tracesStub;
 	}
 	
 	@Override
     public void visitTryCatchBlock(Label start, Label end,
             Label handler, String type) {
-		if (type != null && type.startsWith("java/")) {
-			if (!type.equals("java/lang/Throwable"))
-				type = "stub/" + type;
+		if (tracesStub) {
+			if (type != null && type.startsWith("java/")) {
+				if (!type.equals("java/lang/Throwable"))
+					type = "stub/" + type;
+			}
 		}
 		super.visitTryCatchBlock(start, end, handler, type);
     }
@@ -60,8 +75,7 @@ private String className;
 			return;
 		}
 		
-		AbstractInsnNode node = instructions.getFirst();
-		
+		// Explicitly calls the static initializer
 		if (name.equals("<clinit>")) {
 			InsnList list = new InsnList();
 			list.add(new LdcInsnNode(INVOKESTATIC));
@@ -69,53 +83,68 @@ private String className;
 			list.add(new LdcInsnNode("<clinit>"));
 			list.add(new LdcInsnNode("()V"));
 			list.add(new InsnNode(ICONST_0));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitMethodInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitMethodInsn",
 					"(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", false));
 			
 			instructions.insert(list);
 		}
 		
+		// Injects tracing instructions
+		AbstractInsnNode node = instructions.getFirst();
 		while (node != null) {
-			InsnList insertedInsnList = null;
 			switch (node.getType()) {
+			// 0
 			case AbstractInsnNode.INSN:
-				insertedInsnList = visitInsn((InsnNode) node);
+				node = visitInsn((InsnNode) node);
 				break;
+			// 1
 			case AbstractInsnNode.INT_INSN:
-				insertedInsnList = visitIntInsn((IntInsnNode) node);
+				node = visitIntInsn((IntInsnNode) node);
 				break;
+			// 2
 			case AbstractInsnNode.VAR_INSN:
-				insertedInsnList = visitVarInsn((VarInsnNode) node);
+				node = visitVarInsn((VarInsnNode) node);
 				break;
+			// 3
 			case AbstractInsnNode.TYPE_INSN:
 				node = visitTypeInsn((TypeInsnNode) node);
 				break;
+			// 4
 			case AbstractInsnNode.FIELD_INSN:
 				node = visitFieldInsn((FieldInsnNode) node);
 				break;
+			// 5
 			case AbstractInsnNode.METHOD_INSN:
-				insertedInsnList = visitMethodInsn((MethodInsnNode) node);
+				node = visitMethodInsn((MethodInsnNode) node);
 				break;
+			// 7
 			case AbstractInsnNode.JUMP_INSN:
 				node = visitJumpInsn((JumpInsnNode) node);
 				break;
+			// 8
 			case AbstractInsnNode.LABEL:
 				node = visitLabel((LabelNode) node);
 				break;
+			// 9
 			case AbstractInsnNode.LDC_INSN:
-				insertedInsnList = visitLdc((LdcInsnNode) node);
+				node = visitLdc((LdcInsnNode) node);
 				break;
+			// 10
 			case AbstractInsnNode.IINC_INSN:
-				insertedInsnList = visitIincInsn((IincInsnNode) node);
+				node = visitIincInsn((IincInsnNode) node);
 				break;
-			}
-			
-			if (insertedInsnList != null) {
-				AbstractInsnNode previous = node.getPrevious();
-				if (previous == null)
-					instructions.insert(insertedInsnList);
-				else
-					instructions.insert(previous, insertedInsnList);
+			// 11
+			case AbstractInsnNode.TABLESWITCH_INSN:
+				node = visitTableSwitchInsn((TableSwitchInsnNode) node);
+				break;
+			// 12
+			case AbstractInsnNode.LOOKUPSWITCH_INSN:
+				node = visitLookupSwitchInsn((LookupSwitchInsnNode) node);
+				break;
+			// 13
+			case AbstractInsnNode.MULTIANEWARRAY_INSN:
+				node = visitMultiANewArrayInsn((MultiANewArrayInsnNode) node);
+				break;
 			}
 			
 			if (node != null)
@@ -208,38 +237,41 @@ private String className;
 		return false;
 	}
 	
-	private InsnList visitInsn(InsnNode node) {
+	private AbstractInsnNode visitInsn(InsnNode node) {
 		InsnList list = new InsnList();
-		
 		list.add(new LdcInsnNode(node.getOpcode()));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
                 "(I)V", false));
-		return list;
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
-	private InsnList visitIntInsn(IntInsnNode node) {
+	private AbstractInsnNode visitIntInsn(IntInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
 		list.add(new LdcInsnNode(node.operand));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIntInsn",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIntInsn",
                 "(II)V", false));
-		return list;
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
-	private InsnList visitVarInsn(VarInsnNode node) {
+	private AbstractInsnNode visitVarInsn(VarInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
 		list.add(new LdcInsnNode(node.var));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitVarInsn",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitVarInsn",
                 "(II)V", false));
-		return list;
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
+	// NEW, ANEWARRAY, CHECKCAST or INSTANCEOF
 	private AbstractInsnNode visitTypeInsn(TypeInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
 		list.add(new LdcInsnNode(node.desc));
-		AbstractInsnNode lastNode = new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitTypeInsn",
+		AbstractInsnNode lastNode = new MethodInsnNode(INVOKESTATIC, traceCollector, "visitTypeInsn",
 				"(ILjava/lang/String;)V", false);
 		list.add(lastNode);
 		
@@ -255,7 +287,7 @@ private String className;
 			instructions.insertBefore(prevNode.getPrevious(), node);
 			instructions.insert(prevNode, list);
 		} else {
-			// Insert after the node (not before the node) 
+			// Inserts after the node (not before the node) 
 			// This is to prevent the error with frame that must point to NEW
 			instructions.insert(node, list);
 		}
@@ -269,7 +301,7 @@ private String className;
 		list.add(new LdcInsnNode(node.owner));
 		list.add(new LdcInsnNode(node.name));
 		list.add(new LdcInsnNode(node.desc));
-		AbstractInsnNode lastNode = new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitFieldInsn",
+		AbstractInsnNode lastNode = new MethodInsnNode(INVOKESTATIC, traceCollector, "visitFieldInsn",
 				"(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false);
 		list.add(lastNode);
 		
@@ -277,92 +309,74 @@ private String className;
 		return lastNode;
 	}
 	
-	private InsnList visitMethodInsn(MethodInsnNode node) {	
+	private AbstractInsnNode visitMethodInsn(MethodInsnNode node) {	
 		if (node.owner.startsWith("bt") && !node.owner.startsWith("bt/runtime/"))
-			return null;
+			return node;
 		
-		if (node.owner.equals("java/lang/Object")
-				&& node.name.equals("<init>")
-				&& node.desc.equals("()V")) {
-			InsnList list = new InsnList();
-			list.add(new LdcInsnNode(POP));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
-	                "(I)V", false));
-			return list;
-		}
-		
-		if (node.owner.equals("java/lang/Object")
-				&& node.name.equals("getClass")
-				&& node.desc.equals("()Ljava/lang/Class;")) {
-			InsnList list = new InsnList();
-			list.add(new LdcInsnNode(BIPUSH));
-			list.add(new LdcInsnNode(-2));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIntInsn",
-	                "(II)V", false));
-			list.add(new LdcInsnNode(IALOAD));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
-	                "(I)V", false));
-			return list;
-		}
-		
-		if (node.owner.equals("java/lang/Class")
-				&& node.name.equals("desiredAssertionStatus")
-				&& node.desc.equals("()Z")) {
-			InsnList list = new InsnList();
-			list.add(new LdcInsnNode(POP));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
-	                "(I)V", false));
-			list.add(new LdcInsnNode(ICONST_0));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
-	                "(I)V", false));
-			return list;
-		}
-		
-		if (node.owner.equals("java/lang/Integer")
-				&& node.name.equals("valueOf")
-				&& node.desc.equals("(I)Ljava/lang/Integer;")) {
-			return null;
-		}
-		
-		if (node.owner.equals("java/lang/Integer")
-				&& node.name.equals("intValue")
-				&& node.desc.equals("()I")) {
-			return null;
-		}
-		
-		if (node.owner.equals("java/lang/System")
-				&& node.name.equals("arraycopy")
-				&& node.desc.equals("(Ljava/lang/Object;ILjava/lang/Object;II)V")) {
-			node.owner = "bt/runtime/System";
-		}
-		
-		if (node.owner.equals("java/lang/String")
-				&& node.name.equals("getBytes")
-				&& node.desc.equals("()[B")) {
-			InsnList list = new InsnList();
+//		if (node.owner.equals("java/lang/Object")
+//				&& node.name.equals("<init>")
+//				&& node.desc.equals("()V")) {
+//			InsnList list = new InsnList();
 //			list.add(new LdcInsnNode(POP));
-//			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
+//	                "(I)V", false));
+//			return list;
+//		}
+//		
+//		if (node.owner.equals("java/lang/Object")
+//				&& node.name.equals("getClass")
+//				&& node.desc.equals("()Ljava/lang/Class;")) {
+//			InsnList list = new InsnList();
+//			list.add(new LdcInsnNode(BIPUSH));
+//			list.add(new LdcInsnNode(-2));
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIntInsn",
+//	                "(II)V", false));
+//			list.add(new LdcInsnNode(IALOAD));
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
+//	                "(I)V", false));
+//			return list;
+//		}
+//		
+//		if (node.owner.equals("java/lang/Class")
+//				&& node.name.equals("desiredAssertionStatus")
+//				&& node.desc.equals("()Z")) {
+//			InsnList list = new InsnList();
+//			list.add(new LdcInsnNode(POP));
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
 //	                "(I)V", false));
 //			list.add(new LdcInsnNode(ICONST_0));
-//			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
 //	                "(I)V", false));
-			list.add(new LdcInsnNode(NEWARRAY));
-			list.add(new LdcInsnNode(T_BYTE));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIntInsn",
-	                "(II)V", false));
-			return list;
-		}
-		
-//		if (node.owner.equals("java/nio/ByteBuffer")
-//				&& node.name.equals("allocateDirect")
-//				&& node.desc.equals("(I)Ljava/nio/ByteBuffer;")) {
-//			node.owner = "bt/runtime/ByteBuffer";
-//			node.desc = "(I)Lbt/runtime/ByteBuffer;";
+//			return list;
 //		}
-		
-//		if (node.owner.equals("lljvm/lib/c")
-//				&& node.name.equals("malloc")
-//				&& node.desc.equals("(I)I")) {
+//		
+//		if (node.owner.equals("java/lang/Integer")
+//				&& node.name.equals("valueOf")
+//				&& node.desc.equals("(I)Ljava/lang/Integer;")) {
+//			return null;
+//		}
+//		
+//		if (node.owner.equals("java/lang/Integer")
+//				&& node.name.equals("intValue")
+//				&& node.desc.equals("()I")) {
+//			return null;
+//		}
+//		
+//		if (node.owner.equals("java/lang/System")
+//				&& node.name.equals("arraycopy")
+//				&& node.desc.equals("(Ljava/lang/Object;ILjava/lang/Object;II)V")) {
+//			node.owner = "bt/runtime/System";
+//		}
+//		
+//		if (node.owner.equals("java/lang/String")
+//				&& node.name.equals("getBytes")
+//				&& node.desc.equals("()[B")) {
+//			InsnList list = new InsnList();
+//			list.add(new LdcInsnNode(NEWARRAY));
+//			list.add(new LdcInsnNode(T_BYTE));
+//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIntInsn",
+//	                "(II)V", false));
+//			return list;
 //		}
 		
 		InsnList list = new InsnList();
@@ -371,13 +385,14 @@ private String className;
 		list.add(new LdcInsnNode(node.name));
 		list.add(new LdcInsnNode(node.desc));
 		list.add(new InsnNode((node.itf) ? ICONST_1 : ICONST_0));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitMethodInsn",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitMethodInsn",
 				"(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", false));
-		return list;
+		instructions.insert(node, list);
+		return node;
 	}
 	
+	// No stubs for these classes
 	private static final Set<String> NO_STUBS = new HashSet<String>();
-	
 	static {
 		NO_STUBS.add("java/lang/Object");
 		NO_STUBS.add("java/lang/Class");
@@ -409,22 +424,37 @@ private String className;
 		return name;
 	}
 	
+	private AbstractInsnNode visitInvokeDynamic(InvokeDynamicInsnNode node) {
+		return null;
+	}
+	
 	private AbstractInsnNode visitJumpInsn(JumpInsnNode node) {
-		// Do not trace GOTO
-		if (node.getOpcode() == GOTO) {
-			return node;
-		}
-		
-		AbstractInsnNode retNode = node;
-		
-		// Jump label
+		// Hashes jump label
 		LabelNode jumpLabelNode = node.label;
 		int jumpLabelHash = System.identityHashCode(jumpLabelNode.getLabel());
 		
+		// Adds jump label
+		InsnList list = new InsnList();
+		list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "addLabel",
+		    "(Ljava/lang/String;)V", false));
+		
+		// No next label for GOTO
+		if (node.getOpcode() == GOTO) {
+			list.add(new LdcInsnNode(node.getOpcode()));
+        	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
+        	list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIfInsn",
+    				"(ILjava/lang/String;)V", false));
+        	// Inserts trace
+    		instructions.insertBefore(node, list);
+    		return node;
+		}
+
 		// If the next instruction after IF is not a label, create one
+		AbstractInsnNode lastNode = node;
 		AbstractInsnNode nextLabelNode = node.getNext();
 		int nextLabelHash;
-		if (nextLabelNode.getType() == AbstractInsnNode.LABEL) {
+		if (nextLabelNode != null && nextLabelNode.getType() == AbstractInsnNode.LABEL) {
 			nextLabelHash = System.identityHashCode(((LabelNode) nextLabelNode).getLabel());
 		} else {
 			nextLabelNode = new LabelNode();
@@ -432,31 +462,18 @@ private String className;
 			
 			InsnList l = new InsnList();
 			l.add(nextLabelNode);
-//			l.add(new LdcInsnNode(System.identityHashCode(((LabelNode) nextLabelNode).getLabel())));
-//			retNode = new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLabel",
-//	                "(I)V", false);
 			l.add(new LdcInsnNode(addTraceLabel(nextLabelHash)));
-			retNode = new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLabel",
+			lastNode = new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLabel",
 	                "(Ljava/lang/String;)V", false);
-			l.add(retNode);
+			l.add(lastNode);
 			
 			// Insert new label after the node
 			instructions.insert(node, l);
 		}
 		
-		// Add both jump label and next label to TraceCollector
-		InsnList list = new InsnList();
-//		list.add(new LdcInsnNode(jumpLabelHash));
-//		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "addLabel",
-//                "(I)V", false));
-//		list.add(new LdcInsnNode(nextLabelHash));
-//		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "addLabel",
-//                "(I)V", false));
-		list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "addLabel",
-                "(Ljava/lang/String;)V", false));
+		// Adds next label
 		list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "addLabel",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "addLabel",
                 "(Ljava/lang/String;)V", false));
 		
 		// Trace if-statements
@@ -467,48 +484,23 @@ private String className;
         case Opcodes.IFGE:
         case Opcodes.IFGT:
         case Opcodes.IFLE:
-        	list.add(new InsnNode(DUP));
-        	list.add(new LdcInsnNode(node.getOpcode()));
-        	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
-        	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-        	list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIfInsn",
-    				"(IILjava/lang/String;Ljava/lang/String;)V", false));
-            break;
-
         case Opcodes.IF_ICMPEQ:
         case Opcodes.IF_ICMPNE:
         case Opcodes.IF_ICMPLT:
         case Opcodes.IF_ICMPGE:
         case Opcodes.IF_ICMPGT:
         case Opcodes.IF_ICMPLE:
-        	list.add(new InsnNode(DUP2));
-        	list.add(new LdcInsnNode(node.getOpcode()));
-        	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
-        	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-        	list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIfIcmpInsn",
-    				"(IIILjava/lang/String;Ljava/lang/String;)V", false));
-            break;
-            
         case Opcodes.IF_ACMPEQ:
         case Opcodes.IF_ACMPNE:
-        	list.add(new InsnNode(DUP2));
-        	list.add(new LdcInsnNode(node.getOpcode()));
-        	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
-        	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-        	list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIfAcmpInsn",
-    				"(Ljava/lang/Object;Ljava/lang/Object;ILjava/lang/String;Ljava/lang/String;)V", false));
-            break;
-            
         case Opcodes.IFNULL:
         case Opcodes.IFNONNULL:
-        	list.add(new InsnNode(DUP));
         	list.add(new LdcInsnNode(node.getOpcode()));
         	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
         	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-        	list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIfInsn",
-    				"(Ljava/lang/Object;ILjava/lang/String;Ljava/lang/String;)V", false));
-        	break;
-
+        	list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIfInsn",
+    				"(ILjava/lang/String;Ljava/lang/String;)V", false));
+            break;
+        
         case Opcodes.JSR:	// TODO
             break;
         
@@ -519,7 +511,7 @@ private String className;
 		// Insert trace
 		instructions.insertBefore(node, list);
 		
-		return retNode;
+		return lastNode;
 	}
 	
 	private AbstractInsnNode visitLabel(LabelNode node) {
@@ -540,11 +532,8 @@ private String className;
 		
 		// Creates new instructions that will dynamically remove the label
 		InsnList list = new InsnList();
-//		list.add(new LdcInsnNode(labelHash));
-//		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLabel",
-//                "(I)V", false));
 		list.add(new LdcInsnNode(labels.get(labelHash)));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLabel",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLabel",
                 "(Ljava/lang/String;)V", false));
 		
 		// Inserts new instructions just before the next instruction
@@ -559,29 +548,28 @@ private String className;
 		return l;
 	}
 	
-	private InsnList visitLdc(LdcInsnNode node) {
+	private AbstractInsnNode visitLdc(LdcInsnNode node) {
 		InsnList list = new InsnList();
-		
 		
 		if (node.cst instanceof Integer) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(I)V", false));
 		} else if (node.cst instanceof Long) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(J)V", false));
 		} else if (node.cst instanceof Float) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(F)V", false));
 		} else if (node.cst instanceof Double) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(D)V", false));
 		} else if (node.cst instanceof Type) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(Ljava/lang/Object;)V", false));
 			
 //            int sort = ((Type) node.cst).getSort();
@@ -596,35 +584,88 @@ private String className;
 //            }
         } else if (node.cst instanceof String) {
 			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitLdcInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
 	                "(Ljava/lang/String;)V", false));
 		} else {
 			// TODO Support other types of constant
 			list.add(new LdcInsnNode(ICONST_0));
-			list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitInsn",
+			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
 	                "(I)V", false));
 		}
-		return list;
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
-	private InsnList visitIincInsn(IincInsnNode node) {
+	private AbstractInsnNode visitIincInsn(IincInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.var));
 		list.add(new LdcInsnNode(node.incr));
-		list.add(new MethodInsnNode(INVOKESTATIC, "bt/TraceCollector", "visitIincInsn",
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIincInsn",
                 "(II)V", false));
-		return list;
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
-	void print(int opcode) {
+	InsnList printInsnList(int opcode) {
 		InsnList list = new InsnList();
 		list.add(new FieldInsnNode(GETSTATIC, "java/lang/System", "out",
                 "Ljava/io/PrintStream;"));
 		list.add(new LdcInsnNode(Printer.OPCODES[opcode]));
 		list.add(new MethodInsnNode(INVOKEVIRTUAL, "java/io/PrintStream", "println",
                 "(Ljava/lang/String;)V", false));
+		return list;
+	}
+	
+	// TODO
+	private AbstractInsnNode visitTableSwitchInsn(TableSwitchInsnNode node) {
+		StringBuilder l = new StringBuilder();
+		for (int i = 0; i < node.labels.size(); i++) {
+			if (i > 0)
+				l.append('|');
+			l.append(labels.get(System.identityHashCode(((LabelNode)node.labels.get(i)).getLabel())));
+		}
 		
-//		instructions.insert(node.getPrevious(), list);
+		InsnList list = new InsnList();
+		list.add(new LdcInsnNode(node.min));
+		list.add(new LdcInsnNode(node.max));
+		list.add(new LdcInsnNode(labels.get(System.identityHashCode(node.dflt.getLabel()))));
+		list.add(new LdcInsnNode(l.toString()));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitTableSwitchInsn",
+	                "(IILjava/lang/String;Ljava/lang/String;)V", false));
+		instructions.insertBefore(node, list);
+		return node;
+	}
+	
+	private AbstractInsnNode visitLookupSwitchInsn(LookupSwitchInsnNode node) {
+		StringBuilder k = new StringBuilder();
+		StringBuilder l = new StringBuilder();
+		for (int i = 0; i < node.keys.size(); i++) {
+			if (i > 0) {
+				k.append('|');
+				l.append('|');
+			}
+			k.append(node.keys.get(i));
+			l.append(labels.get(System.identityHashCode(((LabelNode)node.labels.get(i)).getLabel())));
+		}
+
+		InsnList list = new InsnList();
+		list.add(new LdcInsnNode(labels.get(System.identityHashCode(node.dflt.getLabel()))));
+		list.add(new LdcInsnNode(k.toString()));
+		list.add(new LdcInsnNode(l.toString()));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLookupSwitchInsn",
+	                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false));
+		instructions.insertBefore(node, list);
+		return node;
+	}
+	
+	private AbstractInsnNode visitMultiANewArrayInsn(MultiANewArrayInsnNode node) {
+		InsnList list = new InsnList();
+		list.add(new LdcInsnNode(node.desc));
+		list.add(new LdcInsnNode(node.dims));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitMultiANewArrayInsn",
+	                "(Ljava/lang/String;I)V", false));
+		instructions.insertBefore(node, list);
+		return node;
 	}
 	
 	private void visitFrame(FrameNode node) {

@@ -40,20 +40,22 @@ public class TraceCollector {
 			instructions.clear();
 	}
 	
-	public static void log(Logger logger) {
-		System.out.println("log tc");
-		
+	public static void log() {
+		logger.debug("--- TRACE ---");
 		int nodeIndex = 0;
         for (AbstractInsnNode node : instructions) {
         	logger.debug("[{}] {}", nodeIndex++, NodePrinter.print(node));
         }
+		logger.debug("-------------");
 	}
 	
-	public static void log() {
-		int nodeIndex = 0;
-        for (AbstractInsnNode node : instructions) {
-        	logger.debug("[{}] {}", nodeIndex++, NodePrinter.print(node));
-        }
+	public static String[] getInstructions() {
+		String[] is = new String[instructions.size()];
+		int i = 0;
+		for (AbstractInsnNode node : instructions) {
+			is[i++] = NodePrinter.print(node);
+		}
+		return is;
 	}
 	
 	public static void logLabels(Logger logger) {
@@ -97,21 +99,13 @@ public class TraceCollector {
             Object... bsmArgs) {
         instructions.add(new InvokeDynamicInsnNode(name, desc, bsm, bsmArgs));
     }
-    
-    public static void visitIfInsn(final int value, final int opcode, final String jumpLabel, final String nextLabel) {
-        instructions.add(new IfInsnNode(opcode, value, jumpLabel, nextLabel));
+
+    public static void visitIfInsn(final int opcode, final String jumpLabel) {
+        instructions.add(new IfInsnNode(opcode, jumpLabel));
     }
     
-    public static void visitIfIcmpInsn(final int value1, final int value2, final int opcode, final String jumpLabel, final String nextLabel) {
-        instructions.add(new IfInsnNode(opcode, value1, value2, jumpLabel, nextLabel));
-    }
-    
-    public static void visitIfAcmpInsn(final Object value1, final Object value2, final int opcode, final String jumpLabel, final String nextLabel) {
-        instructions.add(new IfInsnNode(opcode, value1, value2, jumpLabel, nextLabel));
-    }
-    
-    public static void visitIfInsn(final Object value, final int opcode, final String jumpLabel, final String nextLabel) {
-        instructions.add(new IfInsnNode(opcode, value, jumpLabel, nextLabel));
+    public static void visitIfInsn(final int opcode, final String jumpLabel, final String nextLabel) {
+        instructions.add(new IfInsnNode(opcode, jumpLabel, nextLabel));
     }
     
     public static void visitLdcInsn(final int cst) {
@@ -140,6 +134,14 @@ public class TraceCollector {
     
     public static void visitIincInsn(final int var, final int increment) {
         instructions.add(new IincInsnNode(var, increment));
+    }
+
+    public static void visitTableSwitchInsn(final int min, final int max, final String dflt, final String labels) {
+    	instructions.add(new TSwitchNode(min, max, dflt, labels));
+    }
+
+    public static void visitLookupSwitchInsn(final String dflt, final String keys, final String labels) {
+    	instructions.add(new LSwitchNode(dflt, keys, labels));
     }
     
     public static void visitMultiANewArrayInsn(final String desc, final int dims) {

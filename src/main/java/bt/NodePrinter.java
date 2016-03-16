@@ -41,7 +41,7 @@ public static String print(AbstractInsnNode node) {
 		}
 		case AbstractInsnNode.JUMP_INSN: {
 			IfInsnNode inode = (IfInsnNode) node;
-			return Printer.OPCODES[node.getOpcode()] + " " + inode.value1 + " " + inode.value2 + " " + inode.jumpLabel + " " + inode.nextLabel;
+			return Printer.OPCODES[node.getOpcode()] + " " + inode.jumpLabel + ((inode.nextLabel == null) ? "" : " " + inode.nextLabel);
 		}
 		case AbstractInsnNode.LABEL: {
 			TraceLabelNode lnode = (TraceLabelNode) node;
@@ -53,9 +53,16 @@ public static String print(AbstractInsnNode node) {
 			IincInsnNode inode = (IincInsnNode) node;
 			return Printer.OPCODES[node.getOpcode()] + " " + inode.var + " " + inode.incr;
 		}
-		case AbstractInsnNode.TABLESWITCH_INSN:
-		case AbstractInsnNode.LOOKUPSWITCH_INSN:
-			return Printer.OPCODES[node.getOpcode()];
+		case AbstractInsnNode.TABLESWITCH_INSN: {
+			TSwitchNode tsnode = (TSwitchNode) node;
+			return Printer.OPCODES[node.getOpcode()] + " " + tsnode.min 
+					+ " " + tsnode.max + " " + tsnode.dflt + " " + tsnode.labels;
+		}
+		case AbstractInsnNode.LOOKUPSWITCH_INSN: {
+			LSwitchNode lsnode = (LSwitchNode) node;
+			return Printer.OPCODES[node.getOpcode()] + " " + lsnode.dflt 
+					+ " " + lsnode.keys + " " + lsnode.labels;
+		}
 		case AbstractInsnNode.MULTIANEWARRAY_INSN: {
 			MultiANewArrayInsnNode mananode = (MultiANewArrayInsnNode) node;
 			return Printer.OPCODES[node.getOpcode()] + " " + mananode.desc + " " + mananode.dims;
