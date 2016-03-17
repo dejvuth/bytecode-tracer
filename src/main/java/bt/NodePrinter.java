@@ -36,8 +36,8 @@ public static String print(AbstractInsnNode node) {
 			return Printer.OPCODES[node.getOpcode()] + " " + mnode.owner + " " + mnode.name + " " + mnode.desc;
 		}
 		case AbstractInsnNode.INVOKE_DYNAMIC_INSN: {
-			InvokeDynamicInsnNode idnode = (InvokeDynamicInsnNode) node;
-			return Printer.OPCODES[node.getOpcode()] + " " + idnode.name + " " + idnode.desc + " " + idnode.bsm + " " + Arrays.toString(idnode.bsmArgs);
+			IDynamicInsnNode idnode = (IDynamicInsnNode) node;
+			return Printer.OPCODES[node.getOpcode()] + " " + idnode.name + " " + idnode.desc + " " + idnode.bsm + " " + idnode.bsmArgs;
 		}
 		case AbstractInsnNode.JUMP_INSN: {
 			IfInsnNode inode = (IfInsnNode) node;

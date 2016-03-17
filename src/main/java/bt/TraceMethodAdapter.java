@@ -117,6 +117,10 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 			case AbstractInsnNode.METHOD_INSN:
 				node = visitMethodInsn((MethodInsnNode) node);
 				break;
+			// 6
+			case AbstractInsnNode.INVOKE_DYNAMIC_INSN:
+				node = visitInvokeDynamicInsn((InvokeDynamicInsnNode) node);
+				break;
 			// 7
 			case AbstractInsnNode.JUMP_INSN:
 				node = visitJumpInsn((JumpInsnNode) node);
@@ -191,23 +195,23 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 			}
 			
 			// Handle stubs
-			case AbstractInsnNode.TYPE_INSN:
-				TypeInsnNode tiNode = (TypeInsnNode) node;
-				tiNode.desc = replaceStub(tiNode.desc);
-				break;
-			case AbstractInsnNode.FIELD_INSN:
-				FieldInsnNode fiNode = (FieldInsnNode) node;
-				fiNode.owner = replaceStub(fiNode.owner);
-				fiNode.desc = replaceStub(fiNode.desc);
-				break;
-			case AbstractInsnNode.METHOD_INSN:
-				MethodInsnNode miNode = (MethodInsnNode) node;
-				miNode.owner = replaceStub(miNode.owner);
-				miNode.desc = replaceStub(miNode.desc);
-				break;
-			case AbstractInsnNode.FRAME:
-				visitFrame((FrameNode) node);
-				break;
+//			case AbstractInsnNode.TYPE_INSN:
+//				TypeInsnNode tiNode = (TypeInsnNode) node;
+//				tiNode.desc = replaceStub(tiNode.desc);
+//				break;
+//			case AbstractInsnNode.FIELD_INSN:
+//				FieldInsnNode fiNode = (FieldInsnNode) node;
+//				fiNode.owner = replaceStub(fiNode.owner);
+//				fiNode.desc = replaceStub(fiNode.desc);
+//				break;
+//			case AbstractInsnNode.METHOD_INSN:
+//				MethodInsnNode miNode = (MethodInsnNode) node;
+//				miNode.owner = replaceStub(miNode.owner);
+//				miNode.desc = replaceStub(miNode.desc);
+//				break;
+//			case AbstractInsnNode.FRAME:
+//				visitFrame((FrameNode) node);
+//				break;
 			}
 		}
 	}
@@ -391,6 +395,27 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	private AbstractInsnNode visitInvokeDynamicInsn(InvokeDynamicInsnNode node) {	
+		StringBuilder b = new StringBuilder();
+		if (node.bsmArgs != null) {
+			for (int i = 0; i < node.bsmArgs.length; i++) {
+				if (i > 0)
+					b.append('|');
+				b.append(node.bsmArgs[i].toString());
+			}
+		}
+		
+		InsnList list = new InsnList();
+		list.add(new LdcInsnNode(node.name));
+		list.add(new LdcInsnNode(node.desc));
+		list.add(new LdcInsnNode(node.bsm.toString()));
+		list.add(new LdcInsnNode(b.toString()));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInvokeDynamicInsn",
+				"(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false));
+		instructions.insert(node, list);
+		return node;
+	}
+	
 	// No stubs for these classes
 	private static final Set<String> NO_STUBS = new HashSet<String>();
 	static {
@@ -424,16 +449,12 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return name;
 	}
 	
-	private AbstractInsnNode visitInvokeDynamic(InvokeDynamicInsnNode node) {
-		return null;
-	}
-	
 	private AbstractInsnNode visitJumpInsn(JumpInsnNode node) {
 		// Hashes jump label
 		LabelNode jumpLabelNode = node.label;
 		int jumpLabelHash = System.identityHashCode(jumpLabelNode.getLabel());
 		
-		// Adds jump label
+		// Adds jump label to trace collector
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
 		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "addLabel",
@@ -476,42 +497,17 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "addLabel",
                 "(Ljava/lang/String;)V", false));
 		
-		// Trace if-statements
-		switch (node.getOpcode()) {
-        case Opcodes.IFEQ:
-        case Opcodes.IFNE:
-        case Opcodes.IFLT:
-        case Opcodes.IFGE:
-        case Opcodes.IFGT:
-        case Opcodes.IFLE:
-        case Opcodes.IF_ICMPEQ:
-        case Opcodes.IF_ICMPNE:
-        case Opcodes.IF_ICMPLT:
-        case Opcodes.IF_ICMPGE:
-        case Opcodes.IF_ICMPGT:
-        case Opcodes.IF_ICMPLE:
-        case Opcodes.IF_ACMPEQ:
-        case Opcodes.IF_ACMPNE:
-        case Opcodes.IFNULL:
-        case Opcodes.IFNONNULL:
-        	list.add(new LdcInsnNode(node.getOpcode()));
-        	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
-        	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
-        	list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIfInsn",
-    				"(ILjava/lang/String;Ljava/lang/String;)V", false));
-            break;
-        
-        case Opcodes.JSR:	// TODO
-            break;
-        
-        default:
-            throw new IllegalArgumentException();
-        }
-		
-		// Insert trace
-		instructions.insertBefore(node, list);
-		
-		return lastNode;
+		// Traces if-statements
+		list.add(new LdcInsnNode(node.getOpcode()));
+    	list.add(new LdcInsnNode(labels.get(jumpLabelHash)));
+    	list.add(new LdcInsnNode(labels.get(nextLabelHash)));
+    	list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIfInsn",
+				"(ILjava/lang/String;Ljava/lang/String;)V", false));
+    	
+    	// Insert trace
+    	instructions.insertBefore(node, list);
+
+    	return lastNode;
 	}
 	
 	private AbstractInsnNode visitLabel(LabelNode node) {
@@ -550,48 +546,9 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 	
 	private AbstractInsnNode visitLdc(LdcInsnNode node) {
 		InsnList list = new InsnList();
-		
-		if (node.cst instanceof Integer) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(I)V", false));
-		} else if (node.cst instanceof Long) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(J)V", false));
-		} else if (node.cst instanceof Float) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(F)V", false));
-		} else if (node.cst instanceof Double) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(D)V", false));
-		} else if (node.cst instanceof Type) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(Ljava/lang/Object;)V", false));
-			
-//            int sort = ((Type) node.cst).getSort();
-//            if (sort == Type.OBJECT || sort == Type.ARRAY) {
-//                return newValue(Type.getObjectType("java/lang/Class"));
-//            } else if (sort == Type.METHOD) {
-//                return newValue(Type
-//                        .getObjectType("java/lang/invoke/MethodType"));
-//            } else {
-//                throw new IllegalArgumentException("Illegal LDC constant "
-//                        + node.cst);
-//            }
-        } else if (node.cst instanceof String) {
-			list.add(new LdcInsnNode(node.cst));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
-	                "(Ljava/lang/String;)V", false));
-		} else {
-			// TODO Support other types of constant
-			list.add(new LdcInsnNode(ICONST_0));
-			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
-	                "(I)V", false));
-		}
+		list.add(new LdcInsnNode(node.cst.toString()));
+		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitLdcInsn",
+                "(Ljava/lang/String;)V", false));
 		instructions.insertBefore(node, list);
 		return node;
 	}

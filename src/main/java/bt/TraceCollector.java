@@ -95,9 +95,9 @@ public class TraceCollector {
         instructions.add(new MethodInsnNode(opcode, owner, name, desc, itf)); 
     }
     
-    public static void visitInvokeDynamicInsn(String name, String desc, Handle bsm,
-            Object... bsmArgs) {
-        instructions.add(new InvokeDynamicInsnNode(name, desc, bsm, bsmArgs));
+    public static void visitInvokeDynamicInsn(String name, String desc, String bsm,
+            String bsmArgs) {
+        instructions.add(new IDynamicInsnNode(name, desc, bsm, bsmArgs));
     }
 
     public static void visitIfInsn(final int opcode, final String jumpLabel) {
@@ -108,27 +108,7 @@ public class TraceCollector {
         instructions.add(new IfInsnNode(opcode, jumpLabel, nextLabel));
     }
     
-    public static void visitLdcInsn(final int cst) {
-        instructions.add(new LdcInsnNode(cst));
-    }
-    
-    public static void visitLdcInsn(final long cst) {
-        instructions.add(new LdcInsnNode(cst));
-    }
-    
-    public static void visitLdcInsn(final float cst) {
-        instructions.add(new LdcInsnNode(cst));
-    }
-    
-    public static void visitLdcInsn(final double cst) {
-        instructions.add(new LdcInsnNode(cst));
-    }
-    
     public static void visitLdcInsn(final String cst) {
-        instructions.add(new LdcInsnNode(cst));
-    }
-    
-    public static void visitLdcInsn(final Object cst) {
         instructions.add(new LdcInsnNode(cst));
     }
     

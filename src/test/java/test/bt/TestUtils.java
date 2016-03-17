@@ -1,6 +1,16 @@
 package test.bt;
 
+import org.objectweb.asm.Type;
+
+
 public class TestUtils {
+	
+	public static String getLabelName(Class<?> c, String mname, Class<?>[] params) 
+			throws NoSuchMethodException, SecurityException {
+		return Type.getInternalName(c)
+				+ "." + mname 
+				+ Type.getMethodDescriptor(c.getMethod(mname, params));
+	}
 
 	public static void print(String[] is, String lname) {
 		for (int i = 0; i < is.length; i++) {
