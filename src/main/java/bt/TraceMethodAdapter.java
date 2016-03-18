@@ -241,6 +241,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return false;
 	}
 	
+	// 0
 	private AbstractInsnNode visitInsn(InsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
@@ -250,6 +251,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 1
 	private AbstractInsnNode visitIntInsn(IntInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
@@ -260,6 +262,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 2
 	private AbstractInsnNode visitVarInsn(VarInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
@@ -270,6 +273,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 3
 	// NEW, ANEWARRAY, CHECKCAST or INSTANCEOF
 	private AbstractInsnNode visitTypeInsn(TypeInsnNode node) {
 		InsnList list = new InsnList();
@@ -299,6 +303,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return lastNode;
 	}
 	
+	// 4
 	private AbstractInsnNode visitFieldInsn(FieldInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
@@ -313,75 +318,10 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return lastNode;
 	}
 	
+	// 5
 	private AbstractInsnNode visitMethodInsn(MethodInsnNode node) {	
 		if (node.owner.startsWith("bt") && !node.owner.startsWith("bt/runtime/"))
 			return node;
-		
-//		if (node.owner.equals("java/lang/Object")
-//				&& node.name.equals("<init>")
-//				&& node.desc.equals("()V")) {
-//			InsnList list = new InsnList();
-//			list.add(new LdcInsnNode(POP));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
-//	                "(I)V", false));
-//			return list;
-//		}
-//		
-//		if (node.owner.equals("java/lang/Object")
-//				&& node.name.equals("getClass")
-//				&& node.desc.equals("()Ljava/lang/Class;")) {
-//			InsnList list = new InsnList();
-//			list.add(new LdcInsnNode(BIPUSH));
-//			list.add(new LdcInsnNode(-2));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIntInsn",
-//	                "(II)V", false));
-//			list.add(new LdcInsnNode(IALOAD));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
-//	                "(I)V", false));
-//			return list;
-//		}
-//		
-//		if (node.owner.equals("java/lang/Class")
-//				&& node.name.equals("desiredAssertionStatus")
-//				&& node.desc.equals("()Z")) {
-//			InsnList list = new InsnList();
-//			list.add(new LdcInsnNode(POP));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
-//	                "(I)V", false));
-//			list.add(new LdcInsnNode(ICONST_0));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInsn",
-//	                "(I)V", false));
-//			return list;
-//		}
-//		
-//		if (node.owner.equals("java/lang/Integer")
-//				&& node.name.equals("valueOf")
-//				&& node.desc.equals("(I)Ljava/lang/Integer;")) {
-//			return null;
-//		}
-//		
-//		if (node.owner.equals("java/lang/Integer")
-//				&& node.name.equals("intValue")
-//				&& node.desc.equals("()I")) {
-//			return null;
-//		}
-//		
-//		if (node.owner.equals("java/lang/System")
-//				&& node.name.equals("arraycopy")
-//				&& node.desc.equals("(Ljava/lang/Object;ILjava/lang/Object;II)V")) {
-//			node.owner = "bt/runtime/System";
-//		}
-//		
-//		if (node.owner.equals("java/lang/String")
-//				&& node.name.equals("getBytes")
-//				&& node.desc.equals("()[B")) {
-//			InsnList list = new InsnList();
-//			list.add(new LdcInsnNode(NEWARRAY));
-//			list.add(new LdcInsnNode(T_BYTE));
-//			list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitIntInsn",
-//	                "(II)V", false));
-//			return list;
-//		}
 		
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.getOpcode()));
@@ -391,10 +331,11 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		list.add(new InsnNode((node.itf) ? ICONST_1 : ICONST_0));
 		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitMethodInsn",
 				"(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", false));
-		instructions.insert(node, list);
+		instructions.insertBefore(node, list);
 		return node;
 	}
 	
+	// 6
 	private AbstractInsnNode visitInvokeDynamicInsn(InvokeDynamicInsnNode node) {	
 		StringBuilder b = new StringBuilder();
 		if (node.bsmArgs != null) {
@@ -412,43 +353,11 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		list.add(new LdcInsnNode(b.toString()));
 		list.add(new MethodInsnNode(INVOKESTATIC, traceCollector, "visitInvokeDynamicInsn",
 				"(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false));
-		instructions.insert(node, list);
+		instructions.insertBefore(node, list);
 		return node;
 	}
 	
-	// No stubs for these classes
-	private static final Set<String> NO_STUBS = new HashSet<String>();
-	static {
-		NO_STUBS.add("java/lang/Object");
-		NO_STUBS.add("java/lang/Class");
-		NO_STUBS.add("java/lang/Throwable");
-		NO_STUBS.add("java/lang/String");
-		NO_STUBS.add("java/lang/Boolean");
-		NO_STUBS.add("java/lang/Character");
-		NO_STUBS.add("java/lang/Byte");
-		NO_STUBS.add("java/lang/Short");
-		NO_STUBS.add("java/lang/Integer");
-		NO_STUBS.add("java/lang/Long");
-		NO_STUBS.add("java/lang/Float");
-		NO_STUBS.add("java/lang/Double");
-		NO_STUBS.add("java/lang/System");
-	}
-	
-	public static String replaceStub(String name) {
-		name = name.replaceAll("java/nio/ByteBuffer", "bt/runtime/ByteBuffer");
-		name = name.replaceAll("java/nio/ByteOrder", "bt/runtime/ByteOrder");
-		name = name.replaceAll("lljvm/lib/c", "bt/runtime/c");
-		
-		if (NO_STUBS.contains(name))
-			return name;
-		
-		name = name.replaceAll("java/", "stub/java/");
-		for (String noStub : NO_STUBS) {
-			name = name.replaceAll("Lstub/" + noStub + ";", "L" + noStub + ";");
-		}
-		return name;
-	}
-	
+	// 7
 	private AbstractInsnNode visitJumpInsn(JumpInsnNode node) {
 		// Hashes jump label
 		LabelNode jumpLabelNode = node.label;
@@ -510,6 +419,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
     	return lastNode;
 	}
 	
+	// 8
 	private AbstractInsnNode visitLabel(LabelNode node) {
 		// Finds next bytecode instruction
 		AbstractInsnNode nextInsnNode = node;
@@ -544,6 +454,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return l;
 	}
 	
+	// 9
 	private AbstractInsnNode visitLdc(LdcInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.cst.toString()));
@@ -553,6 +464,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 10
 	private AbstractInsnNode visitIincInsn(IincInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.var));
@@ -573,7 +485,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return list;
 	}
 	
-	// TODO
+	// 11
 	private AbstractInsnNode visitTableSwitchInsn(TableSwitchInsnNode node) {
 		StringBuilder l = new StringBuilder();
 		for (int i = 0; i < node.labels.size(); i++) {
@@ -593,6 +505,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 12
 	private AbstractInsnNode visitLookupSwitchInsn(LookupSwitchInsnNode node) {
 		StringBuilder k = new StringBuilder();
 		StringBuilder l = new StringBuilder();
@@ -615,6 +528,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 13
 	private AbstractInsnNode visitMultiANewArrayInsn(MultiANewArrayInsnNode node) {
 		InsnList list = new InsnList();
 		list.add(new LdcInsnNode(node.desc));
@@ -625,9 +539,43 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return node;
 	}
 	
+	// 14
 	private void visitFrame(FrameNode node) {
 		node.local = replaceStubs(node.local);
 		node.stack = replaceStubs(node.stack);
+	}
+	
+	// No stubs for these classes
+	private static final Set<String> NO_STUBS = new HashSet<String>();
+	static {
+		NO_STUBS.add("java/lang/Object");
+		NO_STUBS.add("java/lang/Class");
+		NO_STUBS.add("java/lang/Throwable");
+		NO_STUBS.add("java/lang/String");
+		NO_STUBS.add("java/lang/Boolean");
+		NO_STUBS.add("java/lang/Character");
+		NO_STUBS.add("java/lang/Byte");
+		NO_STUBS.add("java/lang/Short");
+		NO_STUBS.add("java/lang/Integer");
+		NO_STUBS.add("java/lang/Long");
+		NO_STUBS.add("java/lang/Float");
+		NO_STUBS.add("java/lang/Double");
+		NO_STUBS.add("java/lang/System");
+	}
+	
+	public static String replaceStub(String name) {
+		name = name.replaceAll("java/nio/ByteBuffer", "bt/runtime/ByteBuffer");
+		name = name.replaceAll("java/nio/ByteOrder", "bt/runtime/ByteOrder");
+		name = name.replaceAll("lljvm/lib/c", "bt/runtime/c");
+		
+		if (NO_STUBS.contains(name))
+			return name;
+		
+		name = name.replaceAll("java/", "stub/java/");
+		for (String noStub : NO_STUBS) {
+			name = name.replaceAll("Lstub/" + noStub + ";", "L" + noStub + ";");
+		}
+		return name;
 	}
 	
 	private static List replaceStubs(List list) {

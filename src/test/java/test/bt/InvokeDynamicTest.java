@@ -37,19 +37,6 @@ public class InvokeDynamicTest {
 		Assert.assertArrayEquals(new String[] {
 				"LABEL " + lname + "0",
 				"GETSTATIC java/lang/System out Ljava/io/PrintStream;",
-				"LDC accept",
-				"LDC (Ljava/io/PrintStream;)Ljava/util/function/Consumer;",
-				"LDC java/lang/invoke/LambdaMetafactory.metafactory"
-				+ "(Ljava/lang/invoke/MethodHandles$Lookup;"
-				+ "Ljava/lang/String;"
-				+ "Ljava/lang/invoke/MethodType;"
-				+ "Ljava/lang/invoke/MethodType;"
-				+ "Ljava/lang/invoke/MethodHandle;"
-				+ "Ljava/lang/invoke/MethodType;"
-				+ ")Ljava/lang/invoke/CallSite; (6)",
-				"LDC (Ljava/lang/Object;)V"
-				+ "|java/io/PrintStream.println(Ljava/lang/String;)V (5)"
-				+ "|(Ljava/lang/String;)V",
 				"INVOKEDYNAMIC accept (Ljava/io/PrintStream;)Ljava/util/function/Consumer; "
 				+ "java/lang/invoke/LambdaMetafactory.metafactory"
 				+ "(Ljava/lang/invoke/MethodHandles$Lookup;"
