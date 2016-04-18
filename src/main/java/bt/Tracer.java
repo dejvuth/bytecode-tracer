@@ -13,6 +13,8 @@ public class Tracer {
 	private Class<?> tracerClass;
 	private Class<?> runningClass;
 	
+	private boolean traceJava;
+	
 	private static Logger logger = LoggerFactory.getLogger(Tracer.class);
 
 	/**
@@ -22,7 +24,7 @@ public class Tracer {
 	 * @throws ClassNotFoundException
 	 */
 	public Tracer(String className) throws ClassNotFoundException {
-		this(className, DEFAULT_TRACE_COLLECTOR);
+		this(className, DEFAULT_TRACE_COLLECTOR, false);
 	}
 	
 	/**
@@ -32,10 +34,12 @@ public class Tracer {
 	 * @param traceCollector the collector name.
 	 * @throws ClassNotFoundException
 	 */
-	public Tracer(String className,  String traceCollector) 
+	public Tracer(String className,  String traceCollector, boolean traceJava) 
 			throws ClassNotFoundException {
+		this.traceJava = traceJava;
+		
 		// Creates a new class loader
-		cl = new InjectedClassLoader(traceCollector);
+		cl = new InjectedClassLoader(traceCollector, traceJava);
 		
 		// Uses the class loader to load the tracer and the traced class
 		tracerClass = cl.loadClass(traceCollector);

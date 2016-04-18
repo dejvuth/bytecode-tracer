@@ -1,6 +1,7 @@
 package test.bt;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import bt.Tracer;
@@ -28,21 +29,26 @@ public class SwitchTest {
 			return 1;
 		}
 	}
+	
+	Tracer tracer;
+	
+	@Before
+	public void setup() throws ClassNotFoundException {
+		tracer = new Tracer(this.getClass().getName());
+	}
 
 	@Test
 	public void testLookup() throws Exception {
 		// Sets up
-		String cname = this.getClass().getName();
 		String mname = "lookup";
 		Class<?>[] params = new Class<?>[] { int.class };
 		Object arg = 3;
-		String lname = cname.replace('.', '/') + "." + mname + "(I)I";
 
 		// Runs
-		Tracer tracer = new Tracer(cname);
 		String[] is = tracer.run(mname, params, arg);
 		
 		// Checks
+		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
 		Assert.assertArrayEquals(new String[] {
 			"LABEL " + lname + "0",
 			"ILOAD 0",
@@ -56,17 +62,15 @@ public class SwitchTest {
 	@Test
 	public void testTable() throws Exception {
 		// Sets up
-		String cname = this.getClass().getName();
 		String mname = "table";
 		Class<?>[] params = new Class<?>[] { int.class };
 		Object arg = -1;
-		String lname = cname.replace('.', '/') + "." + mname + "(I)I";
 
 		// Runs
-		Tracer tracer = new Tracer(cname);
 		String[] is = tracer.run(mname, params, arg);
 		
 		// Checks
+		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
 		Assert.assertArrayEquals(new String[] {
 			"LABEL " + lname + "0",
 			"ILOAD 0",

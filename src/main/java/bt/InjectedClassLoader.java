@@ -34,11 +34,12 @@ public class InjectedClassLoader extends ClassLoader {
 	 * 
 	 * @param traceCollector the collector name.
 	 */
-	public InjectedClassLoader(String traceCollector) {
+	public InjectedClassLoader(String traceCollector, boolean traceJava) {
 		this.traceCollector = traceCollector;
 
 		ignoredPrefixes = new ArrayList<String>();
-		ignoredPrefixes.add("java.");
+		if (!traceJava)
+			ignoredPrefixes.add("java.");
 		ignoredPrefixes.add("javax.");
 		ignoredPrefixes.add("org.slf4j.");
 		ignoredPrefixes.add("ch.qos.logback.");
@@ -54,7 +55,7 @@ public class InjectedClassLoader extends ClassLoader {
 		if (ignoredPrefixes.stream().anyMatch(s -> name.startsWith(s)))
 			return super.loadClass(name);
 		
-		// TODO Loads stub
+		// Loads stub
 		if (name.startsWith(STUB_PREFIX))
 			return loadStub(name);
 		
@@ -77,7 +78,6 @@ public class InjectedClassLoader extends ClassLoader {
 		}
 	}
 	
-	// TODO
 	private Class<?> loadStub(String name) throws ClassNotFoundException {
 		String origName = name.replace(STUB_PREFIX + ".", "");
 		
