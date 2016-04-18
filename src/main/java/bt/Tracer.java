@@ -52,7 +52,7 @@ public class Tracer {
 	 * @param methodName the method name.
 	 * @param methodParams the method parameters (for example <code>new Class<?>[] { int.class }</code>)
 	 * @param args the method arguments (for example <code>42</code>)
-	 * @return
+	 * @return the bytecode trace
 	 * @throws IllegalAccessException
 	 * @throws IllegalArgumentException
 	 * @throws InvocationTargetException
@@ -74,5 +74,22 @@ public class Tracer {
 		}
 
 		return (String[]) tracerClass.getMethod("getInstructions").invoke(null);
+	}
+	
+	/**
+	 * Traces the specified parameter-less method.
+	 * 
+	 * @param methodName the method name.
+	 * @return the bytecode trace
+	 * @throws IllegalAccessException
+	 * @throws IllegalArgumentException
+	 * @throws InvocationTargetException
+	 * @throws NoSuchMethodException
+	 * @throws SecurityException
+	 */
+	public String[] run(String methodName) 
+			throws IllegalAccessException, IllegalArgumentException, 
+			InvocationTargetException, NoSuchMethodException, SecurityException {
+		return run(methodName, null);
 	}
 }

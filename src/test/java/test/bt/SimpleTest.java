@@ -14,6 +14,10 @@ public class SimpleTest {
 			x--; 
 		}
 	}
+	
+	public static void b() {
+		a(3);
+	}
 
 	@Test
 	public void test() throws Exception {
