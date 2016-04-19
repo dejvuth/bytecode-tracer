@@ -14,12 +14,19 @@ public class TestUtils {
 				+ Type.getMethodDescriptor(c.getMethod(mname, params));
 	}
 
+	public static void print(String[] is) {
+		print(is, null);
+	}
+
 	public static void print(String[] is, String lname) {
 		if (!isPrint)
 			return;
 		
 		for (int i = 0; i < is.length; i++) {
-			System.out.print("\"" + is[i].replace(lname, "\" + lname + \"") + "\"");
+			if (lname == null)
+				System.out.print("\"" + is[i] + "\"");
+			else	
+				System.out.print("\"" + is[i].replace(lname, "\" + lname + \"") + "\"");
 
 			if (i < is.length - 1)
 				System.out.println(",");

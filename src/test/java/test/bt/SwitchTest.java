@@ -71,10 +71,13 @@ public class SwitchTest {
 		
 		// Checks
 		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
+		TestUtils.print(is, lname);
 		Assert.assertArrayEquals(new String[] {
 			"LABEL " + lname + "0",
 			"ILOAD 0",
-			"TABLESWITCH -1 0 " + lname + "3 " + lname + "1|" + lname + "2",
+			// javac doesn't produce TABLESWTICH for some reason ...
+//			"TABLESWITCH -1 0 " + lname + "3 " + lname + "1|" + lname + "2",
+			"LOOKUPSWITCH " + lname + "3 -1|0 " + lname + "1|" + lname + "2",
 			"LABEL " + lname + "1",
 			"ICONST_1",
 			"IRETURN"

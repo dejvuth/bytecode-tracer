@@ -33,9 +33,13 @@ public class InvokeDynamicTest {
 
 		// Checks
 		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
+		TestUtils.print(is, lname);
 		Assert.assertArrayEquals(new String[] {
 				"LABEL " + lname + "0",
 				"GETSTATIC java/lang/System out Ljava/io/PrintStream;",
+				"DUP",
+				"INVOKEVIRTUAL java/lang/Object getClass ()Ljava/lang/Class;",
+				"POP",
 				"INVOKEDYNAMIC accept (Ljava/io/PrintStream;)Ljava/util/function/Consumer; "
 				+ "java/lang/invoke/LambdaMetafactory.metafactory"
 				+ "(Ljava/lang/invoke/MethodHandles$Lookup;"

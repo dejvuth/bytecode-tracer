@@ -116,8 +116,10 @@ public class MethodTest {
 		Assert.assertArrayEquals(new String[] {
 				"LABEL " + lname + "0",
 				"NEW java/lang/Double",
+				"DUP",
 				"DLOAD 0",
 				"INVOKESPECIAL java/lang/Double <init> (D)V",
+				"POP",
 				"LABEL " + lname + "1",
 				"RETURN"
 		}, is);

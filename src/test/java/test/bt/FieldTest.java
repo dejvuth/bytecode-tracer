@@ -124,6 +124,7 @@ public class FieldTest {
 		Assert.assertArrayEquals(new String[] {
 				"LABEL " + lname + "0",
 				"NEW test/bt/FieldTest$Inner",
+				"DUP",
 				"ILOAD 0",
 				"INVOKESPECIAL test/bt/FieldTest$Inner <init> (I)V",
 				"LABEL test/bt/FieldTest$Inner.<init>(I)V0",
@@ -133,6 +134,7 @@ public class FieldTest {
 				"ILOAD 1",
 				"PUTFIELD test/bt/FieldTest$Inner f I",
 				"RETURN",
+				"POP",
 				"LABEL " + lname + "1",
 				"RETURN"
 		}, is);
