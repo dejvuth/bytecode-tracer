@@ -71,6 +71,61 @@ public class SimpleTest {
 		// Sets up
 		String mname = "fib";
 		Class<?>[] params = new Class<?>[] { int.class };
+		Object arg = 2;
+
+		// Runs
+		String[] is = tracer.run(mname, params, arg);
+		
+		// Checks
+		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
+		TestUtils.print(is, lname);
+		Assert.assertArrayEquals(new String[] {
+			"LABEL " + lname + "0",
+			"ILOAD 0",
+			"IFGE " + lname + "2 " + lname + "1",
+			"LABEL " + lname + "2",
+			"ILOAD 0",
+			"ICONST_1",
+			"IF_ICMPGT " + lname + "4 " + lname + "3",
+			"LABEL " + lname + "4",
+			"ILOAD 0",
+			"ICONST_1",
+			"ISUB",
+			"INVOKESTATIC test/bt/SimpleTest fib (I)I",
+			"LABEL " + lname + "0",
+			"ILOAD 0",
+			"IFGE " + lname + "2 " + lname + "1",
+			"LABEL " + lname + "2",
+			"ILOAD 0",
+			"ICONST_1",
+			"IF_ICMPGT " + lname + "4 " + lname + "3",
+			"LABEL " + lname + "3",
+			"ILOAD 0",
+			"IRETURN",
+			"ILOAD 0",
+			"ICONST_2",
+			"ISUB",
+			"INVOKESTATIC test/bt/SimpleTest fib (I)I",
+			"LABEL " + lname + "0",
+			"ILOAD 0",
+			"IFGE " + lname + "2 " + lname + "1",
+			"LABEL " + lname + "2",
+			"ILOAD 0",
+			"ICONST_1",
+			"IF_ICMPGT " + lname + "4 " + lname + "3",
+			"LABEL " + lname + "3",
+			"ILOAD 0",
+			"IRETURN",
+			"IADD",
+			"IRETURN"
+		}, is);
+	}
+	
+	@Test
+	public void testFibThrow() throws Exception {
+		// Sets up
+		String mname = "fib";
+		Class<?>[] params = new Class<?>[] { int.class };
 		Object arg = -1;
 
 		// Runs
