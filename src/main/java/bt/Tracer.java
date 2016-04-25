@@ -1,6 +1,7 @@
 package bt;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,13 @@ public class Tracer {
 		tracerClass.getMethod("clear").invoke(null);
 		
 		// Runs!
-		runningClass.getMethod(methodName, methodParams).invoke(null, args);
+		try {
+			runningClass.getMethod(methodName, methodParams).invoke(null, args);
+		} catch (Exception e) {
+			System.out.printf("Running the method %s with argument(s) %s caused an exception%n",
+					methodName, Arrays.toString(args));
+			e.printStackTrace(System.out);
+		}
 		
 		// Logs the execution trace and remaining labels
 		if (logger.isDebugEnabled()) {

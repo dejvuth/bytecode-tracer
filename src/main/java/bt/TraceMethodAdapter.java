@@ -159,6 +159,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		accept(mv);
 	}
 	
+	@SuppressWarnings("unchecked")
 	private void preprocess() {
 		ListIterator<AbstractInsnNode> itr = instructions.iterator();
 		while (itr.hasNext()) {
@@ -577,6 +578,7 @@ public class TraceMethodAdapter extends MethodNode implements Opcodes {
 		return name;
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static List replaceStubs(List list) {
 		if (list == null)
 			return list;

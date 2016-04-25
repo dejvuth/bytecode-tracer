@@ -1,6 +1,7 @@
 package test.bt;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import bt.Tracer;
@@ -17,6 +18,13 @@ public class SimpleTest {
 	
 	public static void b() {
 		a(3);
+	}
+	
+	Tracer tracer;
+	
+	@Before
+	public void setup() throws ClassNotFoundException {
+		tracer = new Tracer(this.getClass().getName());
 	}
 
 	@Test
@@ -47,6 +55,39 @@ public class SimpleTest {
 			"IINC 0 -1",
 			"LABEL test/bt/SimpleTest.a(I)V3",
 			"RETURN"
+		}, is);
+	}
+	
+	public static int fib(int n) {
+		if (n < 0)
+			throw new IllegalArgumentException();
+		if (n <= 1)
+			return n;
+		return fib(n-1) + fib(n-2);
+	}
+	
+	@Test
+	public void testFib() throws Exception {
+		// Sets up
+		String mname = "fib";
+		Class<?>[] params = new Class<?>[] { int.class };
+		Object arg = -1;
+
+		// Runs
+		String[] is = tracer.run(mname, params, arg);
+		
+		// Checks
+		String lname = TestUtils.getLabelName(this.getClass(), mname, params);
+		TestUtils.print(is, lname);
+		Assert.assertArrayEquals(new String[] {
+			"LABEL " + lname + "0",
+			"ILOAD 0",
+			"IFGE " + lname + "2 " + lname + "1",
+			"LABEL " + lname + "1",
+			"NEW java/lang/IllegalArgumentException",
+			"DUP",
+			"INVOKESPECIAL java/lang/IllegalArgumentException <init> ()V",
+			"ATHROW"
 		}, is);
 	}
 }
